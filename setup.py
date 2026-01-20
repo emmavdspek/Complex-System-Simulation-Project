@@ -1,0 +1,1 @@
+#optional, allows the project to be installed like a python package 

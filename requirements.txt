@@ -1,0 +1,1 @@
+Lists of the Python packages needed to run a the project 
