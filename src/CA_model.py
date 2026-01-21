@@ -98,6 +98,9 @@ def update_Scanlon2007(
         frac_occ = np.sum(current_grid) / (size**2)  # fraction of vegetation
         random_nr = np.random.random()  # number to use for updating
 
+        # avoid dividing by zero later on
+        assert frac_occ != 0 and frac_occ != 1
+
         # if the cell is currently unoccupied, update according to the P(o->t) rule
         if current_grid[i, j] == 0:
             prob_flip = rho + (true_frac - frac_occ) / (1 - frac_occ)
