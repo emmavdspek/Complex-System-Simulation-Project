@@ -1,1 +1,5 @@
-Lists of the Python packages needed to run a the project 
+ex: 
+numpy
+matplotlib
+scipy
+pytest
