@@ -12,6 +12,7 @@ Implements:
 
 # Import necessary modules
 import numpy as np
+from scipy.ndimage import convolve
 import matplotlib.pyplot as plt
 from numba import jit
 
@@ -48,6 +49,126 @@ def update_basic(grid, cells_to_update):
             grid[x, y] = 1
 
     return grid
+
+
+@jit(nopython=False)
+def compute_weight_matrix(M, k, dmin=1):
+    """
+    Precompute the distance-based weights for the neighborhood.
+    Returns a (2M+1) x (2M+1) matrix with weights (dmin/dist)**k,
+    and zero at the center (a cell doesn't count itself).
+    """
+    size = 2 * M + 1
+    weights = np.zeros((size, size))
+    
+    for dx in range(-M, M + 1):
+        for dy in range(-M, M + 1):
+            dist = np.sqrt(dx**2 + dy**2)
+            if 0 < dist <= M:
+                weights[dx + M, dy + M] = (dmin / dist) ** k
+    
+    return weights
+
+@jit(nopython=False)
+def compute_local_density(grid, weights):
+    """
+    Compute the local weighted tree density for every cell simultaneously.
+    
+    For each cell, this calculates:
+        rho = sum(weights * neighbor_states) / sum(weights)
+    
+    Using convolution, this becomes a single operation over the whole grid.
+    """
+    # Numerator: weighted sum of occupied neighbors
+    weighted_neighbors = convolve(
+        grid.astype(float), 
+        weights, 
+        mode='wrap'  # periodic boundary conditions
+    )
+    
+    # Denominator: sum of all weights (same for every cell with periodic BC)
+    total_weight = np.sum(weights)
+    
+    # Local density at each cell
+    rho = weighted_neighbors / total_weight
+    
+    return rho
+
+@jit(nopython=False)
+def update_Scanlon2007_fast(grid, cells_to_update, true_frac, weights):
+    """
+    Optimized Scanlon update rule using precomputed weights and convolution.
+    """
+    size = grid.shape[0]
+    
+    # Compute local density for ALL cells at once (the expensive part, now fast)
+    rho = compute_local_density(grid, weights)
+    
+    # Global vegetation fraction
+    frac_occ = np.mean(grid)
+    
+    # Avoid division by zero
+    if frac_occ == 0 or frac_occ == 1:
+        return grid
+    
+    # Update only the selected cells
+    for i, j in cells_to_update:
+        rho_local = rho[i, j]
+        random_nr = np.random.random()
+        
+        if grid[i, j] == 0:  # currently empty
+            prob_flip = rho_local + (true_frac - frac_occ) / (1 - frac_occ)
+            prob_flip = np.clip(prob_flip, 0, 1)  # clamp to valid range
+            if random_nr < prob_flip:
+                grid[i, j] = 1
+                
+        else:  # currently occupied
+            prob_flip = (1 - rho_local) + (frac_occ - true_frac) / frac_occ
+            prob_flip = np.clip(prob_flip, 0, 1)
+            if random_nr < prob_flip:
+                grid[i, j] = 0
+    
+    return grid
+
+
+def evolve_CA_fast(
+    size=500,
+    p=0.5,
+    update_rule=update_Scanlon2007_fast,
+    true_frac=0.1,
+    k=3.0,
+    M=25,
+    f_update=0.2,
+    N_steps=200,
+    skip=100,
+    seed=0,
+):
+    """
+    Optimized evolution function.
+    """
+    np.random.seed(seed)
+    grid = initialize_CA(p, size)
+    grids = []
+    
+    # Precompute weights once (not every iteration!)
+    weights = compute_weight_matrix(M, k)
+    
+    # Fixed: use size**2 for total number of cells
+    N_update = int(f_update * size**2)
+    
+    for n in range(N_steps):
+        # Randomly select cells to update
+        cells_to_update = np.column_stack([
+            np.random.randint(0, size, N_update),
+            np.random.randint(0, size, N_update)
+        ])
+        
+        grid = update_rule(grid, cells_to_update, true_frac, weights)
+        
+        if n >= skip:
+            grids.append(grid.copy())
+    
+    return grids
 
 
 @jit(nopython=False)
