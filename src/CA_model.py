@@ -143,7 +143,7 @@ def evolve_CA(
     np.random.seed(seed)
     grid = initialize_CA(p, size)
     grids = []
-    N_update = int(f_update * size)  # number of cells to update at each step
+    N_update = int(f_update * size**2)  # number of cells to update at each step
 
     for n in range(N_steps):
         # randomly select a fraction of the sites to update
