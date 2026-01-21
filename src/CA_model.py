@@ -1,18 +1,19 @@
 """
-Docstring for CA_Scanlon.py
-2D cellular automaton with update rule according to Scanlon et al (2007).
+Docstring for CA_model.py
+Some 2D cellular automaton update rules, and logic
 Implements:
 - grid initialization
-- Scanlon update rule (still in progress)
-- one full iteration of update steps
-- plotting the grids
+- several update rules:
+    -> Basic
+    -> Neutral (still in progress)
+    -> Scanlon et al. update rule
+- one full evolution of iterations, according to update rule
 """
 
+# Import necessary modules
 import numpy as np
 import matplotlib.pyplot as plt
-
 from numba import jit
-import time
 
 
 def initialize_CA(p=0.5, size=500):
@@ -22,29 +23,36 @@ def initialize_CA(p=0.5, size=500):
     return grid
 
 
-# @jit(nopython=False)
-def show_grids(grids: list, iterations=[0, 200]):
-    """Plots the supplied list of grids next to each other."""
-    if len(grids) > 10:  # do not allow grid lists longer than 10
-        print("The amount of grids supplied is to many, only plotting the first 10.")
-        grids = grids[:10]
+@jit(nopython=False)
+def update_basic(grid, cells_to_update):
+    """
+    Function which decides what happens to a single cell
+    :param state: empty or a tree (1)
+    :param n_neighbors: if a cell has 3 or 4 neighbors, it becomes empty, otherwise a tree
+    """
+    nx, ny = grid.shape
+    current_grid = grid.copy()
 
-    fig, axs = plt.subplots(
-        1, len(grids), figsize=(len(grids) * 2, 3), sharey=True, constrained_layout=True
-    )
-    for a in range(len(axs)):
-        ax = axs[a]
-        ax.imshow(grids[a], cmap="YlGn")
-        ax.set_xlabel("x")
-        ax.set_title(f"Iteration {iterations[a]}")
-    axs[0].set_ylabel("y")
-    plt.show()
-    return
+    for x, y in cells_to_update:
+        up = current_grid[
+            (x - 1) % nx, y
+        ]  # the % nx and % ny make the grid wrap around (periodic boundaries)
+        down = current_grid[(x + 1) % nx, y]
+        left = current_grid[x, (y - 1) % ny]
+        right = current_grid[x, (y + 1) % ny]
+        n_neighbors = up + down + left + right
+
+        if n_neighbors in (3, 4):
+            grid[x, y] = 0
+        else:
+            grid[x, y] = 1
+
+    return grid
 
 
 @jit(nopython=False)
 def update_Scanlon2007(
-    grid, random_sel, true_frac=0.3, k=3.0, M=25, dmin=1, BC="periodic"
+    grid, cells_to_update, true_frac=0.3, k=3.0, M=25, dmin=1, BC="periodic"
 ):
     """Update algorithm according to the model presented in Scanlon et al. (2007).
     Input parameters: see evolve_CA.
@@ -56,7 +64,7 @@ def update_Scanlon2007(
     size = np.shape(current_grid)[0]
 
     # loop through all the randomly selected cells
-    for i, j in random_sel:
+    for i, j in cells_to_update:
         cum_distr = 0  # denominator
         numerator = 0  # numerator
 
@@ -109,6 +117,7 @@ def update_Scanlon2007(
 def evolve_CA(
     size=500,
     p=0.5,
+    update_rule=update_Scanlon2007,
     true_frac=0.1,
     k=3.0,
     M=25,
@@ -136,59 +145,19 @@ def evolve_CA(
     grids = []
     N_update = int(f_update * size)  # number of cells to update at each step
 
-    start = time.time()
     for n in range(N_steps):
         # randomly select a fraction of the sites to update
-        random_sel = np.reshape(np.random.choice(size, N_update * 2), (N_update, 2))
+        cells_to_update = np.reshape(
+            np.random.choice(size, N_update * 2), (N_update, 2)
+        )
         # update the grid one step
-        grid = update_Scanlon2007(grid, random_sel, true_frac, k, M)
+        if update_rule == update_Scanlon2007:
+            update_args = [cells_to_update, true_frac, k, M]
+        elif update_rule == update_basic:
+            update_args = [cells_to_update]
+        grid = update_rule(grid, *update_args)
         # if we are beyond equilibration, save the grid to the list to return
         if n >= skip:
             grids.append(grid.copy())
-    end = time.time()
-    print(f"It took {end-start} seconds to compute all the data.")
 
     return grids
-
-
-# FIRST ATTEMPT AT SOME ANALYSIS OF THE DATA, SHOULD BE MOVED TO ANALYSIS.PY EVENTUALLY
-
-from pylab import *
-from scipy.ndimage import label
-from scipy.ndimage import sum
-
-
-def cluster_size_distribution(grids: list, plot=True):
-    size = np.shape(grids[0])[0]  # grid size
-    size_occurrences = np.zeros(
-        size**2
-    )  # 1D array where indices correspond to cluster sizes
-    N_grids = len(grids)
-    start = time.time()
-    for grid in grids:
-        lw, num = label(grid)
-        sizes = sum(grid, lw, index=arange(lw.max() + 1))
-        for size in sizes:
-            size_occurrences[int(size)] += 1
-    size_occurrences /= N_grids  # normalize by the number of grids
-    size_occurrences = np.trim_zeros(size_occurrences, "b")
-
-    ### some code for fitting here ###
-
-    end = time.time()
-    print(f"It took {end-start} seconds to analyse all the data.")
-
-    if plot:
-        plt.plot(size_occurrences, "o", color="red")
-        plt.xscale("log")
-        plt.yscale("log")
-        plt.xlabel("Cluster size")
-        plt.ylabel("Mean occurrence")
-        plt.show()
-    return size_occurrences
-
-
-# Test the functions
-grids = evolve_CA(size=500, p=0.5, true_frac=0.3, k=3, M=25, N_steps=200, skip=100)
-show_grids([grids[0], grids[-1]])
-cluster_size_distr = cluster_size_distribution(grids)
