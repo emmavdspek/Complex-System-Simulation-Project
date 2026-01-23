@@ -156,59 +156,110 @@ from pylab import *
 from scipy.ndimage import label
 from scipy.ndimage import sum
 from scipy.optimize import curve_fit
+from scipy.optimize import leastsq
+import powerlaw
 
 
-def powerlaw_exp(sizes, A=1e6, beta=1, s_char=1e6):
-    return A * (sizes ** (-beta)) * np.exp(-sizes / s_char)
+def powerlaw_exp(sizes, A=1e4, beta=1.5, s_char=1e2):
+    """General function of a power law with an exponential cutoff.
+    The arguments represent:
+    - A:        height of the curve in loglog-space;
+    - beta:     scaling exponent, slope of the straight part of the curve in loglog-space;
+    - s_char:   characteristic size, point from which powerlaw is cut off.
+    Outputs the y-coords correponding to the x-coords 'sizes'."""
+    return A * (sizes ** (-beta)) * np.exp(-(sizes) / s_char)
+
+
+def loglog_powerlaw_exp(log_sizes, A=1e4, beta=1.5, s_char=1e2):
+    """General function of a power law with an exponential cutoff.
+    The arguments represent:
+    - A:        height of the curve in loglog-space;
+    - beta:     scaling exponent, slope of the straight part of the curve in loglog-space;
+    - s_char:   characteristic size, point from which powerlaw is cut off.
+    Outputs the y-coords correponding to the x-coords 'sizes'."""
+    return np.log(A) - beta * log_sizes + np.exp(-(log_sizes)) / s_char
 
 
 def cluster_size_distribution(grids: list, plot=True):
+    """Computes the cluster size distribution of a given list of grids.
+    This list can consist of 1 dataset (a single evolution of a CA), or multiple
+    sets can be combined into one list. The arguments are:
+    - grids:    1D list of 2D arrays (grids) corresponding to iterations of am evolved CA;
+    - plot:     boolean, if True the results are plotted as well, if False not.
+    Returns a 1D array of mean occurrences of cluster sizes throughout all provided grids.
+    """
     size = np.shape(grids[0])[0]  # grid size
-    size_occurrences = np.zeros(
-        size**2
-    )  # 1D array where indices correspond to cluster sizes
+    # size_occurrences = np.zeros(
+    #     size**2
+    # )  # 1D array where indices correspond to cluster sizes
     N_grids = len(grids)
-    start = time.time()
+    size_list = []
     for grid in grids:
         lw, num = label(grid)
         clust_sizes = sum(grid, lw, index=arange(lw.max() + 1))
-        for size in clust_sizes:
-            size_occurrences[int(size)] += 1
-    size_occurrences /= N_grids  # normalize by the number of grids
-    size_occurrences = np.trim_zeros(size_occurrences, "b")
-    sizes = np.arange(1, len(size_occurrences) + 1)
+        size_list += list(clust_sizes[clust_sizes != 0])
+        # for size in clust_sizes:
+        #     size_occurrences[int(size)] += 1
+    # print(size_list)
+    # size_occurrences = np.trim_zeros(size_occurrences, "b")
+    # size_occurrences /= N_grids  # divide by the number of grids
+    # size_occurrences /= np.sum(size_occurrences)  # normalize to get probabilities
+    # sizes = np.arange(1, len(size_occurrences) + 1)
 
+    # # fit to a general powerlaw with exponential cut-off
+    # popt, pcov = curve_fit(
+    #     powerlaw_exp,
+    #     sizes,
+    #     size_occurrences,
+    #     p0=[1.0e4, 1.5, 1.0e3],
+    #     bounds=([1e2, 0.1, 1e2], [1.0e6, 1.0e2, 1.0e5]),
+    # )
+    # log_appr_size_occurrences = np.where(
+    #     size_occurrences == 0.0, 1e-5, size_occurrences
+    # )
+    # print(log_appr_size_occurrences)
     # fit to a general powerlaw with exponential cut-off
-    popt, pcov = curve_fit(
-        powerlaw_exp,
-        sizes,
-        size_occurrences,
-        p0=[1.0e4, 1.5, 1.0e3],
-        # bounds=(0.01, np.array([1.0e6, 1.0e2, 1.0e6])),
-    )
-    print(popt)
+    # popt, pcov = curve_fit(
+    #     loglog_powerlaw_exp,
+    #     np.log(sizes),
+    #     np.log(log_appr_size_occurrences),
+    #     p0=[1.0e4, 1.5, 1.0e3],
+    # bounds=([0.1, 0.01, 0.1], [1.0e5, 1.0e2, 1.0e5]),
+    # )
+    # print(popt)
 
-    end = time.time()
-    print(f"It took {end-start} seconds to analyse all the data.")
+    fit = powerlaw.Fit(size_list, discrete=True)
+    beta = fit.truncated_power_law.alpha
+    print("Beta: ", beta)
 
     if plot:
-        plt.plot(size_occurrences, "o", color="black")
-        plt.plot(
-            sizes,
-            powerlaw_exp(sizes, *np.array([1.0e4, 1.5, 1.0e2])),
-            "r-",
-            label=r"fit: A=%5.3f, $\beta$=%5.3f, $s_c$=%5.3f" % tuple(popt),
+        # fig =
+        # fig.plot(size_occurrences, "o", color="black")
+        fig = powerlaw.plot_pdf(
+            size_list,
+            linear_bins=True,
+            color="black",
+            marker="o",
+            markersize=3,
+            linewidth=0,
         )
-        plt.xscale("log")
-        plt.yscale("log")
-        plt.xlabel("Cluster size")
-        plt.ylabel("Mean occurrence")
-        plt.legend()
-        plt.show()
-    return size_occurrences
+        fit.truncated_power_law.plot_pdf(ax=fig, color="red")
+        # plt.plot(
+        #     sizes,
+        #     # powerlaw_exp(sizes, *popt),
+        #     "r-",
+        #     label=r"fit: A=%5.3f, $\beta$=%5.3f, $s_c$=%5.3f" % tuple(popt),
+        # )
+        # fig.set_xscale("log")
+        # fig.set_yscale("log")
+        fig.set_xlabel("Cluster size")
+        fig.set_ylabel("Mean occurrence")
+        # plt.legend()
+        # plt.show()
+    return size_list
 
 
 # Test the functions
-grids = evolve_CA(size=500, p=0.5, true_frac=0.3, k=3, M=20, N_steps=200, skip=0)
-show_grids([grids[0], grids[-1]], [0, 200])
+grids = evolve_CA(size=300, p=0.5, true_frac=0.3, k=3, M=20, N_steps=150, skip=0)
+# show_grids([grids[0], grids[-1]], [0, 200])
 cluster_size_distr = cluster_size_distribution(grids[100:])
