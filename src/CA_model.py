@@ -98,6 +98,9 @@ def update_Scanlon2007(
         frac_occ = np.sum(current_grid) / (size**2)  # fraction of vegetation
         random_nr = np.random.random()  # number to use for updating
 
+        # avoid dividing by zero later on
+        assert frac_occ != 0 and frac_occ != 1
+
         # if the cell is currently unoccupied, update according to the P(o->t) rule
         if current_grid[i, j] == 0:
             prob_flip = rho + (true_frac - frac_occ) / (1 - frac_occ)
@@ -405,7 +408,7 @@ def evolve_CA(
     np.random.seed(seed)
     grid = initialize_CA(p, size)
     grids = []
-    N_update = int(f_update * size)  # number of cells to update at each step
+    N_update = int(f_update * size**2)  # number of cells to update at each step
 
     for n in range(N_steps):
         # randomly select a fraction of the sites to update
