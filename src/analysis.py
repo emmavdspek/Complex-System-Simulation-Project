@@ -1,17 +1,26 @@
 """
-function for analyzing the results
+functions for analyzing the results
 """
 
 import numpy as np
 import matplotlib.pyplot as plt
-from pylab import *
+from scipy.optimize import curve_fit
+
+# modules necessary for finding the cluster size distribution:
+# (source: https://stackoverflow.com/questions/25664682/how-to-find-cluster-sizes-in-2d-numpy-array)
+from pylab import arange
 from scipy.ndimage import label
 from scipy.ndimage import sum
-from scipy.optimize import curve_fit
+import powerlaw
 
 
 def show_grids(grids: list, iterations=[0, 200]):
-    """Plots the supplied list of grids next to each other."""
+    """
+    Plots the supplied list of grids next to each other, to show evolution.
+    Takes as arguments:
+    - grids:        1D list of 2D arrays (grids) corresponding to iterations in the evolution of a CA.
+    - iterations:   frame-numbers of the provided grids. Typically the first and last of a full evolution.
+    """
     if len(grids) > 10:  # do not allow grid lists longer than 10
         print("The amount of grids supplied is to many, only plotting the first 10.")
         grids = grids[:10]
@@ -29,46 +38,51 @@ def show_grids(grids: list, iterations=[0, 200]):
     return
 
 
-def powerlaw_exp(sizes, A=1e6, beta=1, s_char=1e6):
-    return A * (sizes ** (-beta)) * np.exp(-sizes / s_char)
-
-
-def cluster_size_distribution(grids: list, plot=True):
-    size = np.shape(grids[0])[0]  # grid size
-    size_occurrences = np.zeros(
-        size**2
-    )  # 1D array where indices correspond to cluster sizes
-    N_grids = len(grids)
+def cluster_sizes(grids: list):
+    """
+    Computes the cluster size distribution of a given list of grids.
+    This list can consist of 1 dataset (a single evolution of a CA), or multiple
+    sets can be combined into one list.
+    Argument:
+    - grids:    1D list of 2D arrays (grids) corresponding to iterations of an evolved CA;
+    Returns:
+    - fit:      fit object from powerlaw module;
+    - fig:      figure containing a plot of the data and the fit, can possibly be used to save later.
+    """
+    size_list = []
     for grid in grids:
         lw, num = label(grid)
         clust_sizes = sum(grid, lw, index=arange(lw.max() + 1))
-        for size in clust_sizes:
-            size_occurrences[int(size)] += 1
-    size_occurrences /= N_grids  # normalize by the number of grids
-    size_occurrences = np.trim_zeros(size_occurrences, "b")
-    sizes = np.arange(1, len(size_occurrences) + 1)
+        size_list += list(clust_sizes[clust_sizes != 0])
 
-    # fit to a general powerlaw with exponential cut-off
-    popt, pcov = curve_fit(
-        powerlaw_exp,
-        sizes,
-        size_occurrences,
-        p0=[1.0e4, 1.5, 1.0e3],
-        # bounds=(0.01, np.array([1.0e6, 1.0e2, 1.0e6])),
+    fit = powerlaw.Fit(size_list, xmin=0, xmax=np.max(size_list), discrete=True)
+
+    return size_list, fit
+
+
+def plot_cluster_size_distr(size_list, fit):
+    """
+    Plots the complementary cumulative (ccdf) cluster size distribution.
+    Arguments (returned by cluster_sizes()):
+    - size_list:    1D array containing the sizes of all the clusters in all evaluated iterations;
+    - fit:          fit object generated from the powerlaw library.
+    """
+
+    beta = fit.truncated_power_law.alpha  # scaling exponent of power law
+
+    fig = powerlaw.plot_ccdf(
+        size_list,
+        color="black",
+        marker="o",
+        markersize=4,
+        linewidth=0,
     )
+    fit.truncated_power_law.plot_ccdf(
+        ax=fig, color="red", label=r"$\beta=$" + str(np.round(beta, 2))
+    )
+    fig.set_xlabel(r"Cluster size $s$")
+    fig.set_ylabel(r"P($S\geq s$)")
+    fig.legend()
+    plt.show()
 
-    if plot:
-        plt.plot(size_occurrences, "o", color="black")
-        plt.plot(
-            sizes,
-            powerlaw_exp(sizes, *np.array([1.0e4, 1.5, 1.0e2])),
-            "r-",
-            label=r"fit: A=%5.3f, $\beta$=%5.3f, $s_c$=%5.3f" % tuple(popt),
-        )
-        plt.xscale("log")
-        plt.yscale("log")
-        plt.xlabel("Cluster size")
-        plt.ylabel("Mean occurrence")
-        plt.legend()
-        plt.show()
-    return size_occurrences
+    return
