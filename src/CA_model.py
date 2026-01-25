@@ -181,6 +181,7 @@ def evolve_CA(
     described in Scanlon et al. (2007). Input parameters are:
      - size:        the width and height of the CA grid;
      - p:           the initial fraction of occupied (vegetated) sites;
+     - update_rule  the function to use as an update rule
      - true_frac:   the natural fraction of occupied sites (governed by rainfall);
      - k:           parameter in the Pareto-distribution setting strength of local interactions;
      - M:           radius defining size of neighborhood for local interactions;
@@ -190,13 +191,14 @@ def evolve_CA(
      - seed:        for the numpy pseudo-random number generator.
     Returns an array of grid configurations of the CA.
     """
-    # Input validation
+    # === Input validation ===
     _validate_positive_int(size, "size")
     _validate_probability(p, "p")
     _validate_probability(true_frac, "true_frac")
     _validate_probability(f_update, "f_update")
     _validate_positive_int(N_steps, "N_steps")
     _validate_positive_int(M, "M")
+
     if skip < 0:
         raise ValueError(f"skip must be non-negative, got {skip}")
     if skip >= N_steps:
@@ -204,25 +206,33 @@ def evolve_CA(
     if M >= size // 2:
         raise ValueError(f"M ({M}) should be less than size/2 ({size//2})")
 
+    # === Setup ===
     np.random.seed(seed)
     grid = initialize_CA(p, size)
     grids = []
     N_update = int(f_update * size**2)  # number of cells to update at each step
 
+    if update_rule.__name__ == 'update_Scanlon2007':
+        update_args = [true_frac, k, M]
+    elif update_rule.__name__ == 'update_basic':
+        update_args = []
+    else:
+        raise ValueError(f"Unknown update rule: {update_rule.__name__}")
+
+    # === Main loop ===
     for n in range(N_steps):
-        # randomly select a fraction of the sites to update
+        # randomly select a cells to update
         cells_to_update = np.column_stack([
             np.random.randint(0, size, N_update),
             np.random.randint(0, size, N_update)
         ])
+
         # update the grid one step
-        if update_rule.__name__ == 'update_Scanlon2007':
-            update_args = [cells_to_update, true_frac, k, M]
-        elif update_rule.__name__ == 'update_basic':
-            update_args = [cells_to_update]
-        else:
-            raise ValueError(f"Unknown update rule: {update_rule.__name__}")
-        grid = update_rule(grid, *update_args)
+        grid = update_rule(grid, cells_to_update, *update_args)
+
+        # Internal invariant check
+        assert grid.shape == (size, size), "grid shape changed unexpectedly"
+
         # if we are beyond equilibration, save the grid to the list to return
         if n >= skip:
             grids.append(grid.copy())
