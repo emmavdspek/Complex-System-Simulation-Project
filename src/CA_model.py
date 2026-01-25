@@ -14,6 +14,10 @@ Implements:
 import numpy as np
 from numba import jit
 
+# =============================================================================
+# Initialization
+# =============================================================================
+
 
 def initialize_CA(p=0.5, size=500):
     """Initializes a (pseudo-)randomly generated grid of occupied (t) and unoccupied (o) sites,
@@ -21,6 +25,9 @@ def initialize_CA(p=0.5, size=500):
     grid = np.random.choice(np.array([0, 1]), size=(size, size), p=np.array([1 - p, p]))
     return grid
 
+# =============================================================================
+# Update rules
+# =============================================================================
 
 @jit(nopython=False)
 def update_basic(grid, cells_to_update):
@@ -115,6 +122,9 @@ def update_Scanlon2007(
 
     return grid
 
+# =============================================================================
+# Main evolution function
+# =============================================================================
 
 def evolve_CA(
     size=500,
