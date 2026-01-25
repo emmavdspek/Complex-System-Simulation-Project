@@ -211,9 +211,10 @@ def evolve_CA(
 
     for n in range(N_steps):
         # randomly select a fraction of the sites to update
-        cells_to_update = np.reshape(
-            np.random.choice(size, N_update * 2), (N_update, 2)
-        )
+        cells_to_update = np.column_stack([
+            np.random.randint(0, size, N_update),
+            np.random.randint(0, size, N_update)
+        ])
         # update the grid one step
         if update_rule.__name__ == 'update_Scanlon2007':
             update_args = [cells_to_update, true_frac, k, M]
