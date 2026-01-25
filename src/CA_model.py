@@ -197,6 +197,12 @@ def evolve_CA(
     _validate_probability(f_update, "f_update")
     _validate_positive_int(N_steps, "N_steps")
     _validate_positive_int(M, "M")
+    if skip < 0:
+        raise ValueError(f"skip must be non-negative, got {skip}")
+    if skip >= N_steps:
+        raise ValueError(f"skip ({skip}) must be less than N_steps ({N_steps})")
+    if M >= size // 2:
+        raise ValueError(f"M ({M}) should be less than size/2 ({size//2})")
 
     np.random.seed(seed)
     grid = initialize_CA(p, size)
