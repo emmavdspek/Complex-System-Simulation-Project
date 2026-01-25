@@ -14,6 +14,39 @@ Implements:
 import numpy as np
 from numba import jit
 
+
+# =============================================================================
+# Validation helpers (called once at entry points, not in hot loops)
+# =============================================================================
+
+def _validate_probability(value, name):
+    """Validate that a value is a valid probability in [0, 1]."""
+    if not isinstance(value, (int, float)):
+        raise TypeError(f"{name} must be numeric, got {type(value).__name__}")
+    if not 0 <= value <= 1:
+        raise ValueError(f"{name} must be in [0, 1], got {value}")
+
+
+def _validate_positive_int(value, name):
+    """Validate that a value is a positive integer."""
+    if not isinstance(value, (int, np.integer)):
+        raise TypeError(f"{name} must be an integer, got {type(value).__name__}")
+    if value <= 0:
+        raise ValueError(f"{name} must be positive, got {value}")
+
+
+def _validate_grid(grid):
+    """Validate that a grid is a 2D square binary array."""
+    if not isinstance(grid, np.ndarray):
+        raise TypeError(f"grid must be a numpy array, got {type(grid).__name__}")
+    if grid.ndim != 2:
+        raise ValueError(f"grid must be 2D, got {grid.ndim}D")
+    if grid.shape[0] != grid.shape[1]:
+        raise ValueError(f"grid must be square, got shape {grid.shape}")
+    # Assert for internal invariant: values should be 0 or 1
+    assert np.all((grid == 0) | (grid == 1)), "grid contains non-binary values"
+
+
 # =============================================================================
 # Initialization
 # =============================================================================
