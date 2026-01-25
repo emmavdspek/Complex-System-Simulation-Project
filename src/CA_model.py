@@ -12,7 +12,6 @@ Implements:
 
 # Import necessary modules
 import numpy as np
-import matplotlib.pyplot as plt
 from numba import jit
 
 
@@ -154,10 +153,12 @@ def evolve_CA(
             np.random.choice(size, N_update * 2), (N_update, 2)
         )
         # update the grid one step
-        if update_rule == update_Scanlon2007:
+        if update_rule.__name__ == 'update_Scanlon2007':
             update_args = [cells_to_update, true_frac, k, M]
-        elif update_rule == update_basic:
+        elif update_rule.__name__ == 'update_basic':
             update_args = [cells_to_update]
+        else:
+            raise ValueError(f"Unknown update rule: {update_rule.__name__}")
         grid = update_rule(grid, *update_args)
         # if we are beyond equilibration, save the grid to the list to return
         if n >= skip:
