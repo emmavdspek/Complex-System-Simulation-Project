@@ -55,7 +55,12 @@ def _validate_grid(grid):
 def initialize_CA(p=0.5, size=500):
     """Initializes a (pseudo-)randomly generated grid of occupied (t) and unoccupied (o) sites,
     based on a probability of occupation p. Returns the grid."""
-    grid = np.random.choice(np.array([0, 1]), size=(size, size), p=np.array([1 - p, p]))
+    _validate_probability(p, "p")
+    _validate_positive_int(size, "size")
+
+    grid = np.random.choice(np.array([0, 1]),
+                            size=(size, size),
+                            p=np.array([1 - p, p]))
     return grid
 
 # =============================================================================
@@ -185,6 +190,14 @@ def evolve_CA(
      - seed:        for the numpy pseudo-random number generator.
     Returns an array of grid configurations of the CA.
     """
+    # Input validation
+    _validate_positive_int(size, "size")
+    _validate_probability(p, "p")
+    _validate_probability(true_frac, "true_frac")
+    _validate_probability(f_update, "f_update")
+    _validate_positive_int(N_steps, "N_steps")
+    _validate_positive_int(M, "M")
+
     np.random.seed(seed)
     grid = initialize_CA(p, size)
     grids = []
