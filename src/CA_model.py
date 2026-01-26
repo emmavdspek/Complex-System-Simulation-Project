@@ -16,6 +16,7 @@ import matplotlib.pyplot as plt
 from numba import jit
 
 
+
 def initialize_CA(p=0.5, size=500):
     """Initializes a (pseudo-)randomly generated grid of occupied (t) and unoccupied (o) sites,
     based on a probability of occupation p. Returns the grid."""
