@@ -12,16 +12,60 @@ Implements:
 
 # Import necessary modules
 import numpy as np
-import matplotlib.pyplot as plt
 from numba import jit
+
+
+# =============================================================================
+# Validation helpers (called once at entry points, not in hot loops)
+# =============================================================================
+
+def _validate_probability(value, name):
+    """Validate that a value is a valid probability in [0, 1]."""
+    if not isinstance(value, (int, float)):
+        raise TypeError(f"{name} must be numeric, got {type(value).__name__}")
+    if not 0 <= value <= 1:
+        raise ValueError(f"{name} must be in [0, 1], got {value}")
+
+
+def _validate_positive_int(value, name):
+    """Validate that a value is a positive integer."""
+    if not isinstance(value, (int, np.integer)):
+        raise TypeError(f"{name} must be an integer, got {type(value).__name__}")
+    if value <= 0:
+        raise ValueError(f"{name} must be positive, got {value}")
+
+
+def _validate_grid(grid):
+    """Validate that a grid is a 2D square binary array."""
+    if not isinstance(grid, np.ndarray):
+        raise TypeError(f"grid must be a numpy array, got {type(grid).__name__}")
+    if grid.ndim != 2:
+        raise ValueError(f"grid must be 2D, got {grid.ndim}D")
+    if grid.shape[0] != grid.shape[1]:
+        raise ValueError(f"grid must be square, got shape {grid.shape}")
+    # Assert for internal invariant: values should be 0 or 1
+    assert np.all((grid == 0) | (grid == 1)), "grid contains non-binary values"
+
+
+# =============================================================================
+# Initialization
+# =============================================================================
 
 
 def initialize_CA(p=0.5, size=500):
     """Initializes a (pseudo-)randomly generated grid of occupied (t) and unoccupied (o) sites,
     based on a probability of occupation p. Returns the grid."""
-    grid = np.random.choice(np.array([0, 1]), size=(size, size), p=np.array([1 - p, p]))
+    _validate_probability(p, "p")
+    _validate_positive_int(size, "size")
+
+    grid = np.random.choice(np.array([0, 1]),
+                            size=(size, size),
+                            p=np.array([1 - p, p]))
     return grid
 
+# =============================================================================
+# Update rules
+# =============================================================================
 
 @jit(nopython=False)
 def update_basic(grid, cells_to_update):
@@ -116,6 +160,9 @@ def update_Scanlon2007(
 
     return grid
 
+# =============================================================================
+# Main evolution function
+# =============================================================================
 
 def evolve_CA(
     size=500,
@@ -134,6 +181,7 @@ def evolve_CA(
     described in Scanlon et al. (2007). Input parameters are:
      - size:        the width and height of the CA grid;
      - p:           the initial fraction of occupied (vegetated) sites;
+     - update_rule  the function to use as an update rule
      - true_frac:   the natural fraction of occupied sites (governed by rainfall);
      - k:           parameter in the Pareto-distribution setting strength of local interactions;
      - M:           radius defining size of neighborhood for local interactions;
@@ -143,22 +191,48 @@ def evolve_CA(
      - seed:        for the numpy pseudo-random number generator.
     Returns an array of grid configurations of the CA.
     """
+    # === Input validation ===
+    _validate_positive_int(size, "size")
+    _validate_probability(p, "p")
+    _validate_probability(true_frac, "true_frac")
+    _validate_probability(f_update, "f_update")
+    _validate_positive_int(N_steps, "N_steps")
+    _validate_positive_int(M, "M")
+
+    if skip < 0:
+        raise ValueError(f"skip must be non-negative, got {skip}")
+    if skip >= N_steps:
+        raise ValueError(f"skip ({skip}) must be less than N_steps ({N_steps})")
+    if M >= size // 2:
+        raise ValueError(f"M ({M}) should be less than size/2 ({size//2})")
+
+    # === Setup ===
     np.random.seed(seed)
     grid = initialize_CA(p, size)
     grids = []
     N_update = int(f_update * size**2)  # number of cells to update at each step
 
+    if update_rule.__name__ == 'update_Scanlon2007':
+        update_args = [true_frac, k, M]
+    elif update_rule.__name__ == 'update_basic':
+        update_args = []
+    else:
+        raise ValueError(f"Unknown update rule: {update_rule.__name__}")
+
+    # === Main loop ===
     for n in range(N_steps):
-        # randomly select a fraction of the sites to update
-        cells_to_update = np.reshape(
-            np.random.choice(size, N_update * 2), (N_update, 2)
-        )
+        # randomly select a cells to update
+        cells_to_update = np.column_stack([
+            np.random.randint(0, size, N_update),
+            np.random.randint(0, size, N_update)
+        ])
+
         # update the grid one step
-        if update_rule == update_Scanlon2007:
-            update_args = [cells_to_update, true_frac, k, M]
-        elif update_rule == update_basic:
-            update_args = [cells_to_update]
-        grid = update_rule(grid, *update_args)
+        grid = update_rule(grid, cells_to_update, *update_args)
+
+        # Internal invariant check
+        assert grid.shape == (size, size), "grid shape changed unexpectedly"
+
         # if we are beyond equilibration, save the grid to the list to return
         if n >= skip:
             grids.append(grid.copy())
