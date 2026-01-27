@@ -86,12 +86,12 @@ def cluster_sizes(grids: list):
     for grid in grids:
         lw, num = label(grid)
         clust_sizes = sum(grid, lw, index=arange(lw.max() + 1))
-        size_list += list(clust_sizes[clust_sizes != 0])
+        size_list += list(clust_sizes[clust_sizes >= 10])
 
     fit = powerlaw.Fit(
         size_list,
-        xmin=1,
-        xmax=np.max(size_list) * 0.6,
+        xmin=10,
+        xmax=np.max(size_list),
         discrete=True,
     )
 
@@ -107,30 +107,28 @@ def plot_cluster_size_distr(size_lists: list, fits: list):
     """
     N_sets = len(size_lists)
 
-    fig, ax = plt.subplots(figsize=(6, 6))
+    fig, ax = plt.subplots(figsize=(7, 5))
     # list of colors for all the plots
     color_list = list(dict(mcolors.BASE_COLORS, **mcolors.CSS4_COLORS))[::5]
 
     for i in range(N_sets):
-        fits[i].plot_pdf(
+        fits[i].plot_ccdf(
             size_lists[i],
-            linear_bins=False,
             color=color_list[i],
             marker="o",
             markersize=1.5,
             linewidth=0,
         )
         alpha = fits[i].truncated_power_law.alpha  # scaling exponent of power law
-        fits[i].truncated_power_law.plot_pdf(
+        fits[i].truncated_power_law.plot_ccdf(
             ax=ax,
             color=color_list[i],
             linewidth=1,
             label=r"$\alpha=$" + str(np.round(alpha, 2)),
         )
-    ax.set_ylim(1e-10, 1e1)
+    ax.set_ylim(1e-6, 1e1)
     ax.set_xlabel(r"Cluster size $s$")
-    # ax.set_ylabel(r"P($S\geq s$)")
-    ax.set_ylabel(r"P($S=s$)")
-    ax.legend(fontsize="small")
+    ax.set_ylabel(r"P($S\geq s$)")
+    ax.legend(ncol=3, fontsize="small")
 
-    return
+    return fig
