@@ -4,7 +4,7 @@ functions for analyzing the results
 
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.optimize import curve_fit
+from matplotlib import colors as mcolors
 
 # modules necessary for finding the cluster size distribution:
 # (source: https://stackoverflow.com/questions/25664682/how-to-find-cluster-sizes-in-2d-numpy-array)
@@ -88,34 +88,49 @@ def cluster_sizes(grids: list):
         clust_sizes = sum(grid, lw, index=arange(lw.max() + 1))
         size_list += list(clust_sizes[clust_sizes != 0])
 
-    fit = powerlaw.Fit(size_list, xmin=0, xmax=np.max(size_list), discrete=True)
+    fit = powerlaw.Fit(
+        size_list,
+        xmin=1,
+        xmax=np.max(size_list) * 0.6,
+        discrete=True,
+    )
 
     return size_list, fit
 
 
-def plot_cluster_size_distr(size_list, fit):
+def plot_cluster_size_distr(size_lists: list, fits: list):
     """
-    Plots the complementary cumulative (ccdf) cluster size distribution.
+    Plots the complementary cumulative (ccdf) cluster size distribution (P(S>=s)).
     Arguments (returned by cluster_sizes()):
-    - size_list:    1D array containing the sizes of all the clusters in all evaluated iterations;
-    - fit:          fit object generated from the powerlaw library.
+    - size_lists:    list of 1D arrays containing the sizes of all the clusters in one dataset;
+    - fits:          list fit objects per dataset generated from the powerlaw library.
     """
+    N_sets = len(size_lists)
 
-    beta = fit.truncated_power_law.alpha  # scaling exponent of power law
+    fig, ax = plt.subplots(figsize=(6, 6))
+    # list of colors for all the plots
+    color_list = list(dict(mcolors.BASE_COLORS, **mcolors.CSS4_COLORS))[::5]
 
-    fig = powerlaw.plot_ccdf(
-        size_list,
-        color="black",
-        marker="o",
-        markersize=4,
-        linewidth=0,
-    )
-    fit.truncated_power_law.plot_ccdf(
-        ax=fig, color="red", label=r"$\beta=$" + str(np.round(beta, 2))
-    )
-    fig.set_xlabel(r"Cluster size $s$")
-    fig.set_ylabel(r"P($S\geq s$)")
-    fig.legend()
-    plt.show()
+    for i in range(N_sets):
+        fits[i].plot_pdf(
+            size_lists[i],
+            linear_bins=False,
+            color=color_list[i],
+            marker="o",
+            markersize=1.5,
+            linewidth=0,
+        )
+        alpha = fits[i].truncated_power_law.alpha  # scaling exponent of power law
+        fits[i].truncated_power_law.plot_pdf(
+            ax=ax,
+            color=color_list[i],
+            linewidth=1,
+            label=r"$\alpha=$" + str(np.round(alpha, 2)),
+        )
+    ax.set_ylim(1e-10, 1e1)
+    ax.set_xlabel(r"Cluster size $s$")
+    # ax.set_ylabel(r"P($S\geq s$)")
+    ax.set_ylabel(r"P($S=s$)")
+    ax.legend(fontsize="small")
 
     return
