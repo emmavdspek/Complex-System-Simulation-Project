@@ -132,3 +132,22 @@ def plot_cluster_size_distr(size_lists: list, fits: list):
     ax.legend(ncol=3, fontsize="small")
 
     return fig
+
+
+def has_vertical_percolation(grid): 
+    """
+    Docstring for has_vertical_percolation
+    
+    :param grid: returns True if there exists a connected
+    vegetation cluster that touches both the top row and bottom row 
+    """
+    lw, num = label(grid) #label connected components
+
+    top_labels = set(lw[0, :]) #labels in the top row 
+    bottom_labels = set(lw[-1, :]) #labels in the bottom row
+
+    #if any label appears in both sets, we have percolation
+    common = top_labels.intersection(bottom_labels)
+
+    #label 0 = background, so ignore it 
+    return any(lbl != 0for lbl in common)

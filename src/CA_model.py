@@ -474,6 +474,8 @@ def evolve_CA(
         update_args = [true_frac, k, M]
     elif update_rule.__name__ == 'update_basic':
         update_args = []
+    elif update_rule.__name__ == 'update_Scanlon_exp':  # ADD THIS
+        update_args = [true_frac, k, M, phi]
     else:
         raise ValueError(f"Unknown update rule: {update_rule.__name__}")
 
