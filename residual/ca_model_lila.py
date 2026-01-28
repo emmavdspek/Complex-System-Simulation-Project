@@ -72,7 +72,7 @@ plt.colorbar()
 plt.title("CA grid") 
 plt.show()
 
-for t in range(50):
+for t in range(3):
     plt.imshow(grid, cmap="Greens")
     plt.title(f"Step {t}")
     plt.show()

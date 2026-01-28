@@ -63,7 +63,7 @@ def generate_parallel_emma(size, p, update_rule, true_fracs, k, M, N_steps, skip
 
 def save_data_lila(grids, size, update_rule, true_frac, k, M, N_steps, skip, seed, phi):
     # name and directory of file to save the data to
-    filename = f"../data/{update_rule.__name__}/size={size}_Nsteps={N_steps}_skip={skip}_truefrac={np.round(true_frac,2)}_k={k}_M={M}_seed={seed}_phi={phi}.npy"
+    filename = f"../data/{update_rule.__name__}/size={size}_Nsteps={N_steps}_skip={skip}_truefrac={np.round(true_frac,2)}_k={k}_M={M}_seed={seed}_phi={np.round(phi, 2)}.npy"
 
     # first check if the file already exists
     path = Path(filename)
@@ -77,7 +77,7 @@ def save_data_lila(grids, size, update_rule, true_frac, k, M, N_steps, skip, see
 
 def load_data_lila(size, update_rule, true_frac, k, M, N_steps, skip, seed, phi):
     # name and directory of file to retrieve data from
-    filename = f"../data/{update_rule.__name__}/size={size}_Nsteps={N_steps}_skip={skip}_truefrac={true_frac}_k={k}_M={M}_seed={seed}_phi={phi}.npy"
+    filename = f"../data/{update_rule.__name__}/size={size}_Nsteps={N_steps}_skip={skip}_truefrac={np.round(true_frac,2)}_k={k}_M={M}_seed={seed}_phi={np.round(phi,2)}.npy"
     print("Loading the data from: ", filename)
 
     loaded_grids = np.load(filename)
@@ -98,7 +98,7 @@ def single_run_lila(size, p, update_rule, true_frac, k, M, N_steps, skip, seed, 
         seed=seed,
         phi=phi,
     )
-    save_data(grids, size, update_rule, true_frac, k, M, N_steps, skip, seed, phi)
+    save_data_lila(grids, size, update_rule, true_frac, k, M, N_steps, skip, seed, phi)
     return
 
 
