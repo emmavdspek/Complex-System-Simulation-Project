@@ -98,6 +98,36 @@ def cluster_sizes(grids: list):
     return size_list, fit
 
 
+def cluster_sizes_safe(grids):
+    """
+    Docstring for cluster_sizes_safe
+    
+    :param grids: same funciton as above, but safer for grids with small clusters
+    Used for the optimized locabl/global code  
+    Returns (size_list, fit) or (size_list, None) if no valid clusters
+    """
+    size_list = []
+
+    for grid in grids:
+        lw, num = label(grid)
+        if num == 0:
+            continue
+        clust_sizes = sum(grid, lw, index=np.arange(lw.max() + 1))
+        size_list += list(clust_sizes[clust_sizes >= 10])
+
+    if len(size_list) == 0:
+        return size_list, None
+
+    fit = powerlaw.Fit(
+        size_list,
+        xmin=10,
+        xmax=np.max(size_list),
+        discrete=True,
+    )
+
+    return size_list, fit
+
+
 def plot_cluster_size_distr(size_lists: list, fits: list):
     """
     Plots the complementary cumulative (ccdf) cluster size distribution (P(S>=s)).
@@ -141,13 +171,32 @@ def has_vertical_percolation(grid):
     :param grid: returns True if there exists a connected
     vegetation cluster that touches both the top row and bottom row 
     """
-    lw, num = label(grid) #label connected components
+    lw, num = label(grid) #label connected components, lw is the same size as the grid and contains 0 if cell emtpy, or other for vegation cluster; num is the number of clusters
 
-    top_labels = set(lw[0, :]) #labels in the top row 
-    bottom_labels = set(lw[-1, :]) #labels in the bottom row
+    top_labels = set(lw[0, :]) #take all the labels in the top row 
+    bottom_labels = set(lw[-1, :]) #"" in the bottom row
 
-    #if any label appears in both sets, we have percolation
+    #if the same label appears in both sets, we have percolation
     common = top_labels.intersection(bottom_labels)
+
+    #label 0 = background, so ignore it 
+    return any(lbl != 0for lbl in common)
+
+
+def has_horizontal_percolation(grid): 
+    """
+    Docstring for has_horizontal_percolation
+    
+    :param grid: returns True if there exists a connected
+    vegetation cluster that touches the left to the right 
+    """
+    lw, num = label(grid) #label connected components, lw is the same size as the grid and contains 0 if cell emtpy, or other for vegation cluster; num is the number of clusters
+
+    left_labels = set(lw[:, 0]) #take all the labels in the top row 
+    right_labels = set(lw[:, -1]) #"" in the bottom row
+
+    #if the same label appears in both sets, we have percolation
+    common = left_labels.intersection(right_labels)
 
     #label 0 = background, so ignore it 
     return any(lbl != 0for lbl in common)
