@@ -5,6 +5,7 @@ functions for analyzing the results
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import colors as mcolors
+from matplotlib.lines import Line2D
 
 # modules necessary for finding the cluster size distribution:
 # (source: https://stackoverflow.com/questions/25664682/how-to-find-cluster-sizes-in-2d-numpy-array)
@@ -44,30 +45,35 @@ def animate_grids(grids: list, dpi=100):
     """Create and save an animated GIF showing the temporal evolution of CA grids."""
     # Set up the figure
     fig, ax = plt.subplots(figsize=(8, 8))
-    im = ax.imshow(grids[0], cmap="YlGn", interpolation='nearest')
-    ax.set_title('Iteration 0', fontsize=20)
-    ax.axis('off')
+    im = ax.imshow(grids[0], cmap="YlGn", interpolation="nearest")
+    ax.set_title("Iteration 0", fontsize=20)
+    ax.axis("off")
 
     # Define animation function
     def animate(frame):
         i, grid = frame
         im.set_data(grid)
-        ax.set_title(f'Iteration {i}', fontsize=20)
+        ax.set_title(f"Iteration {i}", fontsize=20)
         return [im]
 
     # Set up helper function to display progress
     def progress_callback(current_frame, total_frames):
         """Shows saving progress"""
         if current_frame % 10 == 0:
-            print(f'Saving frame {current_frame}/{total_frames} ...')
+            print(f"Saving frame {current_frame}/{total_frames} ...")
 
     # Create animation
-    anim = FuncAnimation(fig, animate, enumerate(grids),
-                         interval=50, save_count=len(grids))
+    anim = FuncAnimation(
+        fig, animate, enumerate(grids), interval=50, save_count=len(grids)
+    )
     print("Saving animation ... (This can take a while depending on the dpi.)")
-    filename = 'ca_simulation.gif'
-    anim.save(filename, writer=PillowWriter(fps=20), dpi=dpi,
-              progress_callback=progress_callback)
+    filename = "ca_simulation.gif"
+    anim.save(
+        filename,
+        writer=PillowWriter(fps=20),
+        dpi=dpi,
+        progress_callback=progress_callback,
+    )
     print(f"Saved successfully as '{filename}'")
 
 
@@ -103,7 +109,8 @@ def plot_cluster_size_distr(size_lists: list, fits: list):
     Plots the complementary cumulative (ccdf) cluster size distribution (P(S>=s)).
     Arguments (returned by cluster_sizes()):
     - size_lists:    list of 1D arrays containing the sizes of all the clusters in one dataset;
-    - fits:          list fit objects per dataset generated from the powerlaw library.
+    - fits:          list of fit objects per dataset generated from the powerlaw library.
+    Returns: the figure object for saving.
     """
     N_sets = len(size_lists)
 
@@ -131,4 +138,98 @@ def plot_cluster_size_distr(size_lists: list, fits: list):
     ax.set_ylabel(r"P($S\geq s$)")
     ax.legend(ncol=3, fontsize="small")
 
+<<<<<<< Updated upstream
     return fig
+=======
+<<<<<<< Updated upstream
+    return
+=======
+    return fig
+
+
+def plot_alpha_vs_true_frac(fits: list, true_fracs: list):
+    """
+    Plots the optimal scaling parameter of the truncated power law fit as a function of the true_frac parameter.
+    Argument (returned by cluster_sizes()):
+    - fits:     list of fit objects per dataset generated from the powerlaw library.
+    Returns: the figure object for saving.
+    """
+    N_sets = len(fits)
+
+    fig, ax = plt.subplots(figsize=(4, 3))
+    # list of colors for all the plots
+    color_list = list(dict(mcolors.BASE_COLORS, **mcolors.CSS4_COLORS))[::5]
+
+    for i in range(N_sets):
+        alpha = fits[i].truncated_power_law.alpha  # scaling exponent of power law
+        ax.scatter(true_fracs[i], alpha, color=color_list[i])
+
+    ax.set_xlabel(r"`Natural' vegetation fraction $f_t$")
+    ax.set_ylabel(r"Scaling parameter $\alpha$")
+    ax.legend(fontsize="small")
+
+    return fig
+
+
+def plot_fit_statistics_vs_true_frac(fits: list, true_fracs: list):
+    """
+    Plots the significance values of the truncated power law fit as a function of the true_frac parameter.
+    Arguments (returned by cluster_sizes()):
+    - size_lists:    list of 1D arrays containing the sizes of all the clusters in one dataset;
+    - fits:          list of fit objects per dataset generated from the powerlaw library.
+    Returns: the figure object for saving.
+    """
+    N_sets = len(fits)
+
+    fig, axs = plt.subplots(1, 2, figsize=(8, 3))
+    # list of colors for all the plots
+    color_list = list(dict(mcolors.BASE_COLORS, **mcolors.CSS4_COLORS))[::5]
+
+    for i in range(N_sets):
+        Rexp, pexp = fits[i].distribution_compare(
+            "truncated_power_law", "exponential", normalized_ratio=True
+        )
+        Rpowexp, ppowexp = fits[i].distribution_compare(
+            "power_law", "exponential", normalized_ratio=True
+        )
+        axs[0].scatter(true_fracs[i], Rexp, color=color_list[i], marker="^")
+        axs[0].scatter(true_fracs[i], Rpowexp, color=color_list[i], marker="*")
+        axs[1].scatter(true_fracs[i], pexp, color=color_list[i], marker="^")
+        axs[1].scatter(true_fracs[i], ppowexp, color=color_list[i], marker="*")
+
+    exp_marker = Line2D(
+        [0],
+        [0],
+        label="Truncated power law vs. exponential",
+        marker="^",
+        markersize=10,
+        markeredgecolor="grey",
+        markerfacecolor="grey",
+        linestyle="",
+    )
+    plexp_marker = Line2D(
+        [0],
+        [0],
+        label="Power law vs. exponential",
+        marker="*",
+        markersize=10,
+        markeredgecolor="grey",
+        markerfacecolor="grey",
+        linestyle="",
+    )
+
+    axs[0].set_xlabel(r"'Natural' vegetation fraction $f_t^*$")
+    axs[0].set_ylabel(r"Log-likelihood ratio R")
+    axs[1].set_xlabel(r"'Natural' vegetation fraction $f_t^*$")
+    axs[1].set_ylabel(r"Significance value p")
+    fig.legend(
+        handles=[exp_marker, plexp_marker],
+        fontsize="medium",
+        ncols=1,
+        bbox_to_anchor=(0.48, 1.15),
+    )
+    plt.tight_layout()
+
+    return fig
+>>>>>>> Stashed changes
+>>>>>>> Stashed changes
