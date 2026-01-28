@@ -70,6 +70,54 @@ def animate_grids(grids: list, dpi=100):
               progress_callback=progress_callback)
     print(f"Saved successfully as '{filename}'")
 
+from matplotlib.animation import FuncAnimation, PillowWriter
+
+
+def animate_multiple_phis(grids_by_phi, phi_values, dpi=100):
+    """
+    Create a side-by-side animation of CA evolutions for different phi values (weight of the local rule)
+    
+    grids_by_phi : dict {phi : list_of_grids}
+    phi_values   : list of phi values to animate
+    """
+
+    # Number of frames = min length of all grid sequences
+    T = min(len(grids_by_phi[phi]) for phi in phi_values)
+
+    # Set up figure with 1 row and len(phi_values) columns
+    fig, axes = plt.subplots(1, len(phi_values), figsize=(4*len(phi_values), 4))
+
+    # If only one phi, axes is not a list
+    if len(phi_values) == 1:
+        axes = [axes]
+
+    # Initialize images
+    ims = []
+    for ax, phi in zip(axes, phi_values):
+        im = ax.imshow(grids_by_phi[phi][0], cmap="YlGn", interpolation='nearest')
+        ax.set_title(f"phi = {phi}", fontsize=14)
+        ax.axis("off")
+        ims.append(im)
+
+    # Animation function
+    def animate(t):
+        for im, ax, phi in zip(ims, axes, phi_values):
+            im.set_data(grids_by_phi[phi][t])
+        return ims
+
+    # Create animation
+    anim = FuncAnimation(
+        fig,
+        animate,
+        frames=T,
+        interval=100,
+        blit=False
+    )
+
+    print("Saving animation...")
+    anim.save("multi_phi_animation.gif", writer=PillowWriter(fps=10), dpi=dpi)
+    print("Saved as multi_phi_animation.gif")
+
 
 def cluster_sizes(grids: list):
     """

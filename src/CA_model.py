@@ -408,12 +408,12 @@ def update_Scanlon_exp(
 
         #The weighted combination of both 
         if current_grid[i,j]==0:
-            prob_flip= phi*rho + omega *global_term
+            prob_flip= (phi*rho + omega *global_term)*2 
             prob_flip= min(max(prob_flip, 0.0),1.0)
             if random_nr < prob_flip: #of the weighted probability is higher, then change into a tree 
                 grid[i,j] =1
         else: 
-            prob_flip = phi*(1 - rho) +omega *global_term
+            prob_flip = (phi*(1 - rho) +omega *global_term)*2 #since both probability can be up to 1, they add up to 2
             prob_flip = min(max(prob_flip, 0.0), 1.0)
             if random_nr < prob_flip: 
                 grid[i,j] = 0
