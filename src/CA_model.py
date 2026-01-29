@@ -160,9 +160,266 @@ def update_Scanlon2007(
 
     return grid
 
-# =============================================================================
-# Main evolution function
-# =============================================================================
+
+
+@jit(nopython=False)
+def update_Scanlon2007_local_only(
+    grid, cells_to_update, true_frac=0.3, k=3.0, M=25, dmin=1, BC="periodic" #fp = current fraction of trees 
+): 
+    """Updated model from Scalon2007, by using the LOCAL rule only
+   If a cell has many trees nearby, has more chance to become a tree 
+
+   => we remove f_t*
+   """
+    current_grid = grid.copy()
+    size = np.shape(current_grid)[0]
+
+    # loop through all the randomly selected cells
+    for i, j in cells_to_update:
+        cum_distr = 0  # denominator
+        numerator = 0  # numerator
+
+        # loop through all neighbors and add contributions to the num./denom. of rho
+        for dx in range(-M, M + 1):
+            for dy in range(-M, M + 1):
+                dist = np.sqrt((dx) ** 2 + (dy) ** 2) #distand between cell and neighbor, gives closer neighbors more influence
+
+
+                # PERIODIC BOUNDARY CONDITIONS, the one we use 
+                if BC == "periodic": #the grid never "ends" like a donut-shaped grid 
+                    # if the neighbor is within bounds and within range, add contributions
+                    if 0 < dist <= M:
+                        cum_distr += (dmin / dist) ** k
+                        numerator += (dmin / dist) ** k * current_grid[
+                            (i + dx) % size, (j + dy) % size #this % makes it wrap around the grid (comes back on the other side)
+                        ]
+
+        # define parameters necessary for the update rule
+        rho = numerator / cum_distr  # rho_t in the paper (neighbourhood tree density)
+        frac_occ = np.sum(current_grid) / (size**2)  # fraction of vegetation, f_t in paper 
+        random_nr = np.random.random()  # number to use for updating
+
+        # if cell is 0, update according to the P(o->t) rule (equations from paper)
+        if current_grid[i, j] == 0:
+            prob_flip = rho #the local rule only depends on rho
+            # if the probability exceeds that of a randomly generated number, flip the state to occupied
+            if random_nr < prob_flip:
+                grid[i, j] = 1
+        # if cell is 1, update according to the P(t->o) rule
+        elif current_grid[i, j] == 1:
+            prob_flip = 1 - rho 
+            # if the probability exceeds that of a randomly generated number, flip the state to unoccupied
+            if random_nr < prob_flip:
+                grid[i, j] = 0
+
+    return grid
+
+
+
+@jit(nopython=False)
+def update_Scanlon2007_global_only(
+    grid, cells_to_update, true_frac=0.3, k=3.0, M=25, dmin=1, BC="periodic"
+):
+    """Updated model from Scalon2007, by using the GLOBAL rule only (f_t*)
+
+   It's the expected percentage of tree in this area depending on the rain
+
+   => we remove rho_t
+    """
+    current_grid = grid.copy()
+    size = np.shape(current_grid)[0]
+
+    # loop through all the randomly selected cells
+    for i, j in cells_to_update:
+        cum_distr = 0  # denominator
+        numerator = 0  # numerator
+
+        # loop through all neighbors and add contributions to the num./denom. of rho
+        for dx in range(-M, M + 1):
+            for dy in range(-M, M + 1):
+                dist = np.sqrt((dx) ** 2 + (dy) ** 2) #distand between cell and neighbor, gives closer neighbors more influence
+
+                # CLOSED BOUNDARY CONDITIONS, we don't use it, we just have it 
+                if BC == "aperiodic": #meaning you are on the edge and no neighbors next to you
+                    # if the neighbor is within bounds and within range, add contributions
+                    if (
+                        (0 <= (i + dx) < size)
+                        and (0 <= (j + dy) < size)
+                        and (0 < dist <= M)
+                    ):
+                        cum_distr += (dmin / dist) ** k
+                        numerator += (dmin / dist) ** k * current_grid[i + dx, j + dy]
+
+                # PERIODIC BOUNDARY CONDITIONS, the one we use 
+                elif BC == "periodic": #the grid never "ends" like a donut-shaped grid 
+                    # if the neighbor is within bounds and within range, add contributions
+                    if 0 < dist <= M:
+                        cum_distr += (dmin / dist) ** k
+                        numerator += (dmin / dist) ** k * current_grid[
+                            (i + dx) % size, (j + dy) % size #this % makes it wrap around the grid (comes back on the other side)
+                        ]
+
+        # define parameters necessary for the update rule
+        frac_occ = np.sum(current_grid) / (size**2)  # fraction of vegetation, f_t in paper 
+        random_nr = np.random.random()  # number to use for updating
+
+        # if cell is 0, update according to the P(o->t) rule (equations from paper)
+        if current_grid[i, j] == 0:
+            prob_flip = (true_frac - frac_occ) / (1 - frac_occ)
+            # if the probability exceeds that of a randomly generated number, flip the state to occupied
+            if random_nr < prob_flip:
+                grid[i, j] = 1
+        # if cell is 1, update according to the P(t->o) rule
+        elif current_grid[i, j] == 1:
+            prob_flip = (frac_occ - true_frac) / (frac_occ)
+            # if the probability exceeds that of a randomly generated number, flip the state to unoccupied
+            if random_nr < prob_flip:
+                grid[i, j] = 0
+
+    return grid
+
+@jit(nopython=False)
+def update_Scanlon2007_deterministic(
+    grid, cells_to_update, true_frac=0.3, k=3.0, M=25, dmin=1, BC="periodic"
+):
+    """Updated model from Scalon2007, by using the global rule only
+      In this function, we use the determinisitc probability instead of stochastic 
+    """
+    current_grid = grid.copy()
+    size = np.shape(current_grid)[0]
+
+    # loop through all the randomly selected cells
+    for i, j in cells_to_update:
+        cum_distr = 0  # denominator
+        numerator = 0  # numerator
+
+        # loop through all neighbors and add contributions to the num./denom. of rho
+        for dx in range(-M, M + 1):
+            for dy in range(-M, M + 1):
+                dist = np.sqrt((dx) ** 2 + (dy) ** 2) #distand between cell and neighbor, gives closer neighbors more influence
+
+                # CLOSED BOUNDARY CONDITIONS, we don't use it, we just have it 
+                if BC == "aperiodic": #meaning you are on the edge and no neighbors next to you
+                    # if the neighbor is within bounds and within range, add contributions
+                    if (
+                        (0 <= (i + dx) < size)
+                        and (0 <= (j + dy) < size)
+                        and (0 < dist <= M)
+                    ):
+                        cum_distr += (dmin / dist) ** k
+                        numerator += (dmin / dist) ** k * current_grid[i + dx, j + dy]
+
+                # PERIODIC BOUNDARY CONDITIONS, the one we use 
+                elif BC == "periodic": #the grid never "ends" like a donut-shaped grid 
+                    # if the neighbor is within bounds and within range, add contributions
+                    if 0 < dist <= M:
+                        cum_distr += (dmin / dist) ** k
+                        numerator += (dmin / dist) ** k * current_grid[
+                            (i + dx) % size, (j + dy) % size #this % makes it wrap around the grid (comes back on the other side)
+                        ]
+
+        # define parameters necessary for the update rule
+        rho = numerator / cum_distr  # rho_t in the paper (neighbourhood tree density)
+        frac_occ = np.sum(current_grid) / (size**2)  # fraction of vegetation, f_t in paper 
+        random_nr = np.random.random()  # number to use for updating
+
+        # if cell is 0, update according to the P(o->t) rule (equations from paper)
+        if current_grid[i, j] == 0:
+            prob_flip = (true_frac - frac_occ) / (1 - frac_occ)
+            # if  probability exceeds 0.5, flip to occupied, we remove randomness
+            if prob_flip > 0.5:
+                grid[i, j] = 1
+       
+        # if cell is 1, update according to the P(t->o) rule
+        elif current_grid[i, j] == 1:
+            prob_flip = (frac_occ - true_frac) / (frac_occ)
+            
+            # if the probability 0.5 flip to unocuppied  
+            if prob_flip < 0.5:
+                grid[i, j] = 0
+
+    return grid
+
+
+"""
+We use a phi and omega parameter to see difference of rule weigthage 
+phi to change wheigt of local rule 
+omega for global 
+"""
+@jit(nopython=False)
+def update_Scanlon_exp(
+    grid, cells_to_update, true_frac=0.3, k=3.0, M=25, dmin=1, BC="periodic", phi = 0.5
+):
+    """Update algorithm according to the model presented in Scanlon et al. (2007).
+    Input parameters: see evolve_CA.
+    One additional parameter:
+    - BC:   either "periodic" or "aperiodic", sets the boundary conditions for evaluating
+            the neighborhood of each cell.
+    Returns the CA grid after one iteration of updating."""
+    current_grid = grid.copy()
+    size = np.shape(current_grid)[0]
+    omega = 1- phi #the weight of both rules should add up to 1
+    eps = 1e-9 #small number to prevent division by 0
+    
+    # loop through all the randomly selected cells
+    for i, j in cells_to_update:
+        cum_distr = 0  # denominator
+        numerator = 0  # numerator
+
+        # loop through all neighbors and add contributions to the num./denom. of rho
+        for dx in range(-M, M + 1):
+            for dy in range(-M, M + 1):
+                dist = np.sqrt((dx) ** 2 + (dy) ** 2)
+
+                # CLOSED BOUNDARY CONDITIONS
+                if BC == "aperiodic":
+                    # if the neighbor is within bounds and within range, add contributions
+                    if (
+                        (0 <= (i + dx) < size)
+                        and (0 <= (j + dy) < size)
+                        and (0 < dist <= M)
+                    ):
+                        cum_distr += (dmin / dist) ** k
+                        numerator += (dmin / dist) ** k * current_grid[i + dx, j + dy]
+
+                # PERIODIC BOUNDARY CONDITIONS
+                elif BC == "periodic":
+                    # if the neighbor is within bounds and within range, add contributions
+                    if 0 < dist <= M:
+                        cum_distr += (dmin / dist) ** k
+                        numerator += (dmin / dist) ** k * current_grid[
+                            (i + dx) % size, (j + dy) % size
+                        ]
+
+        # define parameters necessary for the update rule
+        rho = numerator / (cum_distr+eps)  # rho_t in the paper, the epsilon avoid the division by 0 when using only local or global rule 
+        frac_occ = np.sum(current_grid) / (size**2)  # fraction of vegetation
+        frac_occ = min(max(frac_occ, eps), 1-eps)
+        random_nr = np.random.random()  # number to use for updating
+
+        #Fist global term safely bounded 
+        if current_grid[i,j] ==0:
+            global_term = (true_frac-frac_occ)/(1-frac_occ) #from formulas paper 
+        else: 
+            global_term=(frac_occ-true_frac)/frac_occ
+        
+        #Clip between 0 and 1
+        global_term = min(max(global_term, 0.0), 1.0)
+
+        #The weighted combination of both 
+        if current_grid[i,j]==0:
+            prob_flip= (phi*rho + omega *global_term)*2 
+            prob_flip= min(max(prob_flip, 0.0),1.0)
+            if random_nr < prob_flip: #of the weighted probability is higher, then change into a tree 
+                grid[i,j] =1
+        else: 
+            prob_flip = (phi*(1 - rho) +omega *global_term)*2 #since both probability can be up to 1, they add up to 2
+            prob_flip = min(max(prob_flip, 0.0), 1.0)
+            if random_nr < prob_flip: 
+                grid[i,j] = 0
+        
+    return grid
+
 
 def evolve_CA(
     size=500,
@@ -171,10 +428,11 @@ def evolve_CA(
     true_frac=0.1,
     k=3.0,
     M=25,
-    f_update=0.2,
+    f_update=0.2, #the percentage of cells that are updated for realistic reasons (same as paper)
     N_steps=200,
     skip=100,
     seed=0,
+    phi = 0.5 #weight of the local rule 
 ):
     """
     Evolves a 2D CA one timestep at a time, according to the update rule
@@ -216,6 +474,8 @@ def evolve_CA(
         update_args = [true_frac, k, M]
     elif update_rule.__name__ == 'update_basic':
         update_args = []
+    elif update_rule.__name__ == 'update_Scanlon_exp':  # ADD THIS
+        update_args = [true_frac, k, M, phi]
     else:
         raise ValueError(f"Unknown update rule: {update_rule.__name__}")
 
