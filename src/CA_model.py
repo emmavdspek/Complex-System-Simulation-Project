@@ -16,7 +16,7 @@ from numba import jit
 
 
 # =============================================================================
-# Validation helpers (called once at entry points, not in hot loops)
+# Validation helpers
 # =============================================================================
 
 def _validate_probability(value, name):
