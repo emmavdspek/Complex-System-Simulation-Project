@@ -1,1 +1,6 @@
-Lists of the Python packages needed to run a the project 
+matplotlib>=3.10.8
+numba>=0.62.1
+numpy>=2.4.1
+powerlaw>=2.0.0
+scipy>=1.17.0
+pillow>=9.5.0
