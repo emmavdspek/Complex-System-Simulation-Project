@@ -30,14 +30,15 @@ def show_grids(grids: list, iterations=[0, 200]):
     fig, axs = plt.subplots(
         1, len(grids), figsize=(len(grids) * 2, 3), sharey=True, constrained_layout=True
     )
+    if len(grids) == 1:
+        axs = [axs]
     for a in range(len(axs)):
         ax = axs[a]
         ax.imshow(grids[a], cmap="YlGn")
         ax.set_xlabel("x")
         ax.set_title(f"Iteration {iterations[a]}")
     axs[0].set_ylabel("y")
-    plt.show()
-    return
+    return fig
 
 
 def animate_grids(grids: list, dpi=100):
@@ -75,13 +76,14 @@ def animate_grids(grids: list, dpi=100):
     )
     print(f"Saved successfully as '{filename}'")
 
+
 from matplotlib.animation import FuncAnimation, PillowWriter
 
 
 def animate_multiple_phis(grids_by_phi, phi_values, dpi=100):
     """
     Create a side-by-side animation of CA evolutions for different phi values (weight of the local rule)
-    
+
     grids_by_phi : dict {phi : list_of_grids}
     phi_values   : list of phi values to animate
     """
@@ -90,7 +92,7 @@ def animate_multiple_phis(grids_by_phi, phi_values, dpi=100):
     T = min(len(grids_by_phi[phi]) for phi in phi_values)
 
     # Set up figure with 1 row and len(phi_values) columns
-    fig, axes = plt.subplots(1, len(phi_values), figsize=(4*len(phi_values), 4))
+    fig, axes = plt.subplots(1, len(phi_values), figsize=(4 * len(phi_values), 4))
 
     # If only one phi, axes is not a list
     if len(phi_values) == 1:
@@ -99,7 +101,7 @@ def animate_multiple_phis(grids_by_phi, phi_values, dpi=100):
     # Initialize images
     ims = []
     for ax, phi in zip(axes, phi_values):
-        im = ax.imshow(grids_by_phi[phi][0], cmap="YlGn", interpolation='nearest')
+        im = ax.imshow(grids_by_phi[phi][0], cmap="YlGn", interpolation="nearest")
         ax.set_title(f"phi = {phi}", fontsize=14)
         ax.axis("off")
         ims.append(im)
@@ -111,13 +113,7 @@ def animate_multiple_phis(grids_by_phi, phi_values, dpi=100):
         return ims
 
     # Create animation
-    anim = FuncAnimation(
-        fig,
-        animate,
-        frames=T,
-        interval=100,
-        blit=False
-    )
+    anim = FuncAnimation(fig, animate, frames=T, interval=100, blit=False)
 
     print("Saving animation...")
     anim.save("multi_phi_animation.gif", writer=PillowWriter(fps=10), dpi=dpi)
@@ -154,9 +150,9 @@ def cluster_sizes(grids: list):
 def cluster_sizes_safe(grids):
     """
     Docstring for cluster_sizes_safe
-    
+
     :param grids: same funciton as above, but safer for grids with small clusters
-    Used for the optimized locabl/global code  
+    Used for the optimized locabl/global code
     Returns (size_list, fit) or (size_list, None) if no valid clusters
     """
     size_list = []
@@ -222,7 +218,8 @@ def plot_cluster_size_distr(size_lists: list, fits: list, params=[], param_name=
     ax.set_ylim(1e-6, 1e1)
     ax.set_xlabel(r"Cluster size $s$")
     ax.set_ylabel(r"P($S\geq s$)")
-    ax.legend(ncol=3, fontsize="small")
+    if len(params) > 0:
+        ax.legend(ncol=3, fontsize="small")
     return fig
 
 
@@ -368,39 +365,43 @@ def plot_fit_statistics_vs_true_frac(fits: list, true_fracs: list, plot_all=Fals
     return fig
 
 
-def has_vertical_percolation(grid): 
+def has_vertical_percolation(grid):
     """
     Docstring for has_vertical_percolation
-    
+
     :param grid: returns True if there exists a connected
-    vegetation cluster that touches both the top row and bottom row 
+    vegetation cluster that touches both the top row and bottom row
     """
-    lw, num = label(grid) #label connected components, lw is the same size as the grid and contains 0 if cell emtpy, or other for vegation cluster; num is the number of clusters
+    lw, num = label(
+        grid
+    )  # label connected components, lw is the same size as the grid and contains 0 if cell emtpy, or other for vegation cluster; num is the number of clusters
 
-    top_labels = set(lw[0, :]) #take all the labels in the top row 
-    bottom_labels = set(lw[-1, :]) #"" in the bottom row
+    top_labels = set(lw[0, :])  # take all the labels in the top row
+    bottom_labels = set(lw[-1, :])  # "" in the bottom row
 
-    #if the same label appears in both sets, we have percolation
+    # if the same label appears in both sets, we have percolation
     common = top_labels.intersection(bottom_labels)
 
-    #label 0 = background, so ignore it 
-    return any(lbl != 0for lbl in common)
+    # label 0 = background, so ignore it
+    return any(lbl != 0 for lbl in common)
 
 
-def has_horizontal_percolation(grid): 
+def has_horizontal_percolation(grid):
     """
     Docstring for has_horizontal_percolation
-    
+
     :param grid: returns True if there exists a connected
-    vegetation cluster that touches the left to the right 
+    vegetation cluster that touches the left to the right
     """
-    lw, num = label(grid) #label connected components, lw is the same size as the grid and contains 0 if cell emtpy, or other for vegation cluster; num is the number of clusters
+    lw, num = label(
+        grid
+    )  # label connected components, lw is the same size as the grid and contains 0 if cell emtpy, or other for vegation cluster; num is the number of clusters
 
-    left_labels = set(lw[:, 0]) #take all the labels in the top row 
-    right_labels = set(lw[:, -1]) #"" in the bottom row
+    left_labels = set(lw[:, 0])  # take all the labels in the top row
+    right_labels = set(lw[:, -1])  # "" in the bottom row
 
-    #if the same label appears in both sets, we have percolation
+    # if the same label appears in both sets, we have percolation
     common = left_labels.intersection(right_labels)
 
-    #label 0 = background, so ignore it 
-    return any(lbl != 0for lbl in common)
+    # label 0 = background, so ignore it
+    return any(lbl != 0 for lbl in common)
