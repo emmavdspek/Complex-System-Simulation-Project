@@ -2,7 +2,7 @@
 
 ## Using cellular automata to model vegetation patterns in drylands
 Team 15
-Students: Emma van der Spel, Justus de Bruijn Kops, Lila Wagenaar
+Students: Emma van der Spek, Justus de Bruijn Kops, Lila Wagenaar
 
 ### Project overview 
 Many arid and semi-arid regions exhibit large-scale vegetation patterns spanning multiple spatial scales. These patters suggest that ecosystems arise through self-organization rather than fine-tuned environmental conditions. 
